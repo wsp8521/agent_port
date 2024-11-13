@@ -1,71 +1,34 @@
-import os
-from dotenv import load_dotenv
-from pynput import keyboard
+from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 from langchain_openai import ChatOpenAI
-import numpy
-import sounddevice as sd #classe que ornece funcionalidades para manipulação de áudio
+import pandas as pd
+from langchain.agents.agent_types import AgentType
+import os
 
-
-
+from dotenv import load_dotenv
 load_dotenv()
 
-class MovCarg:
-    def __init__(self, model):
-        self.model =model
-        self.is_recoding = False,
-        self.audio_data = []
+class AgentMovCarga:
+    def __init__(self,model):
+        self.model = model,
+       # self.data = self.__data_normalize(data)
         
-    
-    
-    def run(self):
-        print("Gravando") 
         
-         #configurações de audio
-        def callback(indata, outdata, frames, time, status):
-            if self.is_recording: #verifica se a gravação foi inicializada
-              self.audio_data.extend(indata.copy) #Armazenamento dos Dados de Áudio adicionando uma cópia dos dados de áudio de entrada (indata.copy) ao final de uma lista .
+    def data_normalize(self, data):
+        # Remover as colunas que você quer normalizar e depois excluir
+        remove_colunas = ['data_atracacao', 'data_inicio', 'data_termino', 'desatracacao']
+        colunas_romalize = ['data_atracacao', 'data_inicio', 'data_termino', 'desatracacao']
         
-        with sd.InputStream( #brir um stream de entrada de áudio,
-            samplerate=44100, # número de amostras de áudio por segundo.
-            channels=2, #número de canais de áudio. 1 indica áudio mono (um único canal) e 2 indica áudio estéreo (dois canais)
-            dtype='int24', #especifica o tipo de dado das amostras de áudio, como float32 ou int16
-            callback=callback, #é uma função que será chamada automaticamente cada vez que o stream receber novos dados de áudio.
-            ):
-            self.__activate_key()
+        # Inicializando df com o valor de data para garantir que 'df' exista
+        df = data.copy()  # Copiar data para df, para não modificar o original
         
+        # Normalizando as colunas de data
+        for col in colunas_romalize:
+            if col in df.columns:  # Verificar se a coluna existe
+                df[col] = df[col].dt.normalize()  # Aplica normalize na coluna
+        
+        # Remover as colunas de data
+        df = df.drop(remove_colunas, axis=1)
+        
+        return df
 
-    #metódo que responsável pela gravação da voz do usuário
-    def __start_recoding_voice(self):
-        if self.is_recoding:
-            self.is_recoding = False
-            self.__save_audio()
-            self.audio_data = []
-        else:
-            print("Gravando")
-            self.audio_data = []
-            self.is_recoding = True
         
-            
-            
-            
-    def __save_audio(self):
-        print("salvando audio")       
-    
-    #Metódo que reconhece a tecla que foi pressionado no teclado
-    def __activate_key(self):
-        def on_activate():
-            self.__start_recod_voice() #incia a gravação da voz ao pessionar a te
-
-        def for_canonical(f):
-            return lambda k: f(l.canonical(k))
-
-        hotkey = keyboard.HotKey(
-            keyboard.HotKey.parse('<ctrl>'), on_activate)
-        
-        with keyboard.Listener(
-                on_press=for_canonical(hotkey.press),
-                on_release=for_canonical(hotkey.release)) as l:
-            l.join()
-                
-        
-    
