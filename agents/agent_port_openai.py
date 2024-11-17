@@ -17,7 +17,7 @@ os.environ['OPENAI_API_KEY'] = os.getenv('TOKEN_OPENAI')
 class AgentPort:
     def __init__(self, model, dataframe):
         self.dataframe = dataframe
-        self.llm = ChatOpenAI(model=model, streaming=True, temperature=0.5)  # Habilitando streaming
+        self.llm = ChatOpenAI(model=model, streaming=True, temperature=0.5, max_tokens=100)  # Habilitando streaming
         self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
         self.create_agent()
 
