@@ -1,13 +1,22 @@
-from agents.mov_carga import AgentMovCarga
-from langchain.chat_models import ChatOpenAI
+import streamlit as st
+from agents.agent_port_openai import AgentPort
 import pandas as pd
-import os
+from interface.agent_port import AgentPortInterface
 
-agent = AgentMovCarga(
-    model = ChatOpenAI(model='gpt-3.5-turbo', api_key=os.getenv('TOKEN_OPENAI'), streaming=True),
- 
+# Configuração da página
+st.set_page_config(
+    page_title='Agent Port',
+    page_icon='🚢'
 )
 
-df = agent.data_normalize(data=pd.read_excel('atracacao.xlsx'))
+st.header('🤖 Agent Port 🚢') # Exibição do título
+df = pd.read_excel('atracacao.xlsx')
+st.sidebar.title("Configurações do Chatbot")
+model_choice = st.sidebar.selectbox("Escolha o modelo", ["gpt-3.5-turbo", "gpt-4", "gpt-4o-mini","gpt-3.5"], key="model_choice")
 
-print(df)
+agent = AgentPort(model_choice, df)# Inicializando o agente com o modelo e dataframe
+AgentPortInterface(agent_model=agent).run()
+
+
+# df = pd.read_excel('atracacao.xlsx')
+# agent_port_interface(df)

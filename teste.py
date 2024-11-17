@@ -1,56 +1,71 @@
-from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import ConversationChain
-from langchain.agents import AgentType
-from langchain.memory import ConversationBufferMemory
+import streamlit as st
 import pandas as pd
-import os
-from dotenv import load_dotenv
+import threading
+from utils.normalize_dataframe import normalize_date
+from your_code_module import AgentTalkingCarga  # Substitua pelo nome correto do seu módulo
 
-# Carregar variáveis de ambiente
-load_dotenv()
+# Configurando a página do Streamlit
+st.set_page_config(page_title="Assistente de Carga", layout="wide")
 
-# Inicializar a memória para armazenar o contexto da conversa
-memory = ConversationBufferMemory()
+# Função para carregar dados
+@st.cache
+def load_data(file):
+    try:
+        if file.name.endswith(".csv"):
+            df = pd.read_csv(file)
+        elif file.name.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(file)
+        else:
+            st.error("Formato de arquivo não suportado.")
+            return pd.DataFrame()
+        return normalize_date(df)
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {e}")
+        return pd.DataFrame()
 
-# Criar a instância do modelo com memória e verbose ativado
-conversation = ConversationChain(
-    llm=ChatOpenAI(model='gpt-4o', api_key=os.getenv('TOKEN_OPENAI'), streaming=True),  # Ativar streaming aqui
-    memory=memory,
-    verbose=False
-)
+# Interface de upload de dados
+st.sidebar.header("Configuração")
+uploaded_file = st.sidebar.file_uploader("Faça upload do arquivo (CSV ou Excel):", type=["csv", "xlsx", "xls"])
+model = st.sidebar.selectbox("Modelo OpenAI", options=["gpt-3.5-turbo", "gpt-4"])
+whisper_size = st.sidebar.selectbox("Modelo Whisper", options=["tiny", "base", "small", "medium", "large"])
+voice_mode = st.sidebar.checkbox("Ativar Modo de Voz")
 
-# Carregar o dataframe do Excel
-df = pd.read_excel('atracacao.xlsx')
-df['atracacao'] = df['data_atracacao'].dt.normalize() #adicionando nova coluna apenas com  data
-df = df.drop('data_atracacao',axis=1) #removendo coluna
+# Inicialização do agente
+if uploaded_file:
+    dataframe = load_data(uploaded_file)
+    if not dataframe.empty:
+        agent = AgentTalkingCarga(model=model, dataframe=dataframe, whisper_size=whisper_size, voice=voice_mode)
+    else:
+        st.error("O arquivo de dados é inválido ou está vazio.")
+else:
+    dataframe = None
 
+# Funções de interação
+def process_text_input():
+    user_input = st.text_input("Digite sua pergunta:")
+    if user_input:
+        agent.memory.save_context({"input": user_input}, {"output": ""})
+        response = agent.agent.invoke(user_input)
+        agent.memory.save_context({"input": user_input}, {"output": response["output"]})
+        st.write(f"**AI**: {response['output']}")
 
-# Criar o agente com o dataframe, modelo de linguagem, e memória, com streaming ativado
-agent = create_pandas_dataframe_agent(
-    ChatOpenAI(
-        model='gpt-3.5-turbo',
-        api_key=os.getenv('TOKEN_OPENAI'),
-        streaming=True  # Ativar o streaming aqui
-    ),
-    df=df,
-    verbose=True,
-    agent_type=AgentType.OPENAI_FUNCTIONS,
-    allow_dangerous_code=True,
-    memory=memory  # Configurar a memória no agente
-)
+def process_voice_input():
+    st.write("Modo de voz não suportado no Streamlit.")
+    # Para implementar no futuro.
 
-try:
-    while True:
-        pergunta = input("Pergunta: ")
-        
-        # Adicionar pergunta à memória para manter o contexto
-        conversation_input = conversation.predict(input=pergunta)
+# Aba principal
+st.title("Assistente de Carga")
+if dataframe is not None:
+    st.subheader("Dados Carregados")
+    st.dataframe(dataframe.head(10))
 
-        # Invocar o agente passando a pergunta com memória ativada
-        response = agent.invoke({"input": pergunta})
-        print()
-        print(response['output'])
-
-except KeyboardInterrupt:
-    print("Conversa encerrada.")
+    st.subheader("Interação")
+    interaction_mode = st.radio("Escolha o modo de interação:", options=["Texto", "Voz"])
+    if interaction_mode == "Texto":
+        process_text_input()
+    elif interaction_mode == "Voz" and voice_mode:
+        process_voice_input()
+    else:
+        st.warning("O modo de voz está desativado.")
+else:
+    st.info("Por favor, faça upload de um arquivo CSV ou Excel para começar.")
